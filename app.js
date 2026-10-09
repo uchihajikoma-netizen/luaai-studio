@@ -7,12 +7,12 @@ import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "http
 // Firebase Console > Project settings > Your apps > Web app config.
 // These values are public identifiers, NOT API secrets. Restrict the Firebase API key by domain in Google Cloud.
 const firebaseConfig = {
-  apiKey: "YOUR_FIREBASE_WEB_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_FIREBASE_APP_ID"
+  apiKey: "AIzaSyA_HOYY1QQw0x3nvGa8ww63fdtjtX0rt_Y",
+  authDomain: "luaai-studio.firebaseapp.com",
+  projectId: "luaai-studio",
+  storageBucket: "luaai-studio.firebasestorage.app",
+  messagingSenderId: "476650134947",
+  appId: "1:476650134947:web:6d2a1795eb134b32790e16"
 };
 // Put the deployed Cloudflare Worker base URL here, with no trailing slash.
 const WORKER_URL = "https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev";
