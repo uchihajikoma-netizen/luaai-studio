@@ -1,0 +1,10 @@
+name = "luaai-studio-api"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Use the full OpenAI-compatible chat completions endpoint.
+AI_BASE_URL = "https://api.openai.com/v1/chat/completions"
+AI_MODEL = "gpt-4o-mini"
+FIREBASE_PROJECT_ID = "YOUR_FIREBASE_PROJECT_ID"
+ALLOWED_ORIGIN = "https://YOUR_GITHUB_USERNAME.github.io"
