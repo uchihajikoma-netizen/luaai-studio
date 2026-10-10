@@ -1,12 +1,14 @@
 const corsHeaders = {
 "Access-Control-Allow-Origin": "*",
 "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-"Access-Control-Allow-Headers": "Content-Type, Authorization"
+"Access-Control-Allow-Headers": "Content-Type, Authorization",
+"Access-Control-Max-Age": "86400",
+"Vary": "Origin"
 };
 
 function json(data, status = 200) {
 return new Response(JSON.stringify(data), {
-status,
+status: status,
 headers: {
 ...corsHeaders,
 "Content-Type": "application/json; charset=utf-8"
@@ -15,8 +17,8 @@ headers: {
 }
 
 function decodePart(part) {
-const text = part.replace(/-/g, "+").replace(/_/g, "/");
-const padded = text + "=".repeat((4 - text.length % 4) % 4);
+const normalized = part.replace(/-/g, "+").replace(/_/g, "/");
+const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
 const binary = atob(padded);
 const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
 return JSON.parse(new TextDecoder().decode(bytes));
@@ -39,7 +41,9 @@ payload.aud !== projectId ||
 payload.iss !== "https://securetoken.google.com/" + projectId ||
 typeof payload.sub !== "string" ||
 !payload.sub ||
+!Number.isFinite(payload.exp) ||
 payload.exp <= now ||
+!Number.isFinite(payload.iat) ||
 payload.iat > now + 300
 ) {
 throw new Error("Token Firebase hết hạn hoặc không hợp lệ.");
@@ -53,8 +57,8 @@ if (!response.ok) {
 throw new Error("Không tải được khóa xác minh Firebase.");
 }
 
-const keys = await response.json();
-const jwk = keys.keys.find(key => key.kid === header.kid);
+const keyData = await response.json();
+const jwk = keyData.keys.find(key => key.kid === header.kid);
 
 if (!jwk) {
 throw new Error("Không tìm thấy khóa Firebase.");
@@ -71,7 +75,7 @@ false,
 ["verify"]
 );
 
-const data = new TextEncoder().encode(parts[0] + "." + parts[1]);
+const signedData = new TextEncoder().encode(parts[0] + "." + parts[1]);
 const signatureText = parts[2].replace(/-/g, "+").replace(/_/g, "/");
 const paddedSignature = signatureText + "=".repeat((4 - signatureText.length % 4) % 4);
 const signatureBinary = atob(paddedSignature);
@@ -81,7 +85,7 @@ const valid = await crypto.subtle.verify(
 "RSASSA-PKCS1-v1_5",
 publicKey,
 signature,
-data
+signedData
 );
 
 if (!valid) {
@@ -126,8 +130,8 @@ if (!env.GROQ_API_KEY || !env.FIREBASE_PROJECT_ID) {
 }
 
 try {
-  const auth = request.headers.get("Authorization") || "";
-  const match = auth.match(/^Bearer\s+(.+)$/i);
+  const authorization = request.headers.get("Authorization") || "";
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
 
   if (!match) {
     return json({ error: "Bạn cần đăng nhập Google." }, 401);
@@ -146,7 +150,10 @@ try {
   } else {
     const message = String(body.message || body.prompt || "");
     if (message.trim()) {
-      messages = [{ role: "user", content: message }];
+      messages = [{
+        role: "user",
+        content: message
+      }];
     }
   }
 
@@ -169,7 +176,7 @@ try {
     content:
       "Bạn là LuaAI Studio, trợ lý lập trình Roblox Luau. " +
       "Trả lời bằng tiếng Việt khi người dùng dùng tiếng Việt. " +
-      "Hỗ trợ viết, giải thích và sửa script Roblox hợp lệ. " +
+      "Hỗ trợ viết, giải thích, sửa lỗi và tối ưu script Roblox hợp lệ. " +
       "Không hỗ trợ khai thác hoặc phá hoại server. " +
       "Khi viết code, hãy định dạng rõ ràng bằng Markdown."
   };
@@ -194,7 +201,7 @@ try {
   const result = await response.json();
 
   if (!response.ok) {
-    console.error("Groq error:", JSON.stringify(result));
+    console.error("Groq API error:", JSON.stringify(result));
     return json({
       error: result.error?.message || "Groq API gặp lỗi."
     }, 502);
@@ -203,7 +210,9 @@ try {
   const reply = result.choices?.[0]?.message?.content;
 
   if (typeof reply !== "string" || !reply.trim()) {
-    return json({ error: "AI chưa trả về nội dung." }, 502);
+    return json({
+      error: "AI chưa trả về nội dung."
+    }, 502);
   }
 
   return json({
@@ -213,6 +222,7 @@ try {
 
 } catch (error) {
   console.error("Worker error:", error.message);
+
   return json({
     error: error.message || "Không thể kết nối AI."
   }, 500);
