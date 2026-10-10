@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#090b12">
   <title>LuaAI Studio</title>
   <link rel="stylesheet" href="./style.css">
@@ -10,55 +10,135 @@
 <body>
   <div class="app-shell">
     <aside id="sidebar" class="sidebar">
-      <div class="brand"><div class="brand-mark">L</div><div><strong>LuaAI Studio</strong><small>AI workspace</small></div><button id="closeSidebar" class="icon-btn mobile-only" aria-label="Đóng menu">×</button></div>
-      <button id="newChat" class="primary wide">＋ Chat mới</button>
-      <nav class="nav">
-        <button class="nav-item active" data-view="chat">◈ <span>Trò chuyện AI</span></button>
-        <button class="nav-item" data-view="scripts">⌘ <span>Thư viện script</span></button>
-        <button class="nav-item" data-view="wallpapers">▧ <span>Wallpaper</span></button>
-      </nav>
-      <div class="side-label">LỊCH SỬ GẦN ĐÂY</div>
-      <div id="chatList" class="chat-list"><p class="muted small">Đăng nhập để đồng bộ lịch sử.</p></div>
-      <div class="sidebar-bottom">
-        <div class="user-row"><div id="avatar" class="avatar">?</div><div class="user-meta"><strong id="userName">Chưa đăng nhập</strong><small id="userEmail">Lịch sử riêng tư</small></div></div>
-        <button id="signInBtn" class="secondary wide">Đăng nhập Google</button>
-        <button id="signOutBtn" class="text-btn hidden">Đăng xuất</button>
+      <div class="brand">
+        <div class="brand-mark">L</div>
+        <div>
+          <strong>LuaAI Studio</strong>
+          <small>AI workspace</small>
+        </div>
+        <button id="closeSidebar" class="icon-btn mobile-only" type="button" aria-label="Đóng menu">×</button>
       </div>
-    </aside>
-    <div id="scrim" class="scrim"></div>
-    <main class="main">
-      <header class="topbar">
-        <button id="menuBtn" class="icon-btn" aria-label="Mở menu">☰</button>
-        <div class="top-title"><strong id="viewTitle">Trò chuyện AI</strong><span class="status-dot"></span><small>Studio</small></div>
-        <button id="topNewChat" class="icon-btn" title="Chat mới">＋</button>
-      </header>
-      <section id="chatView" class="view chat-view">
-        <div id="messages" class="messages">
-          <div class="welcome"><div class="welcome-logo">L</div><h1>Chào mừng đến LuaAI Studio</h1><p>Trợ lý AI dành cho Lua, Luau và ý tưởng sáng tạo của bạn.</p>
-            <div class="suggestions"><button data-prompt="Giải thích sự khác nhau giữa Lua và Luau bằng ví dụ.">✦ Học Lua / Luau</button><button data-prompt="Viết một module Lua có chú thích và ví dụ sử dụng.">⌘ Tạo module</button><button data-prompt="Giúp tôi tìm lỗi trong đoạn code sau và giải thích cách sửa.">⚡ Gỡ lỗi code</button></div>
+
+      <button id="newChat" class="primary wide" type="button">＋ Chat mới</button>
+
+      <nav class="nav">
+        <button class="nav-item active" data-view="chat" type="button">◈ <span>Trò chuyện AI</span></button>
+        <button class="nav-item" data-view="scripts" type="button">⌘ <span>Thư viện script</span></button>
+        <button class="nav-item" data-view="wallpapers" type="button">▧ <span>Wallpaper</span></button>
+      </nav>
+
+      <div class="side-label">LỊCH SỬ GẦN ĐÂY</div>
+      <div id="chatList" class="chat-list">
+        <p class="muted small">Đăng nhập để đồng bộ lịch sử.</p>
+      </div>
+
+      <div class="sidebar-bottom">
+        <div class="user-row">
+          <div id="avatar" class="avatar">?</div>
+          <div class="user-meta">
+            <strong id="userName">Chưa đăng nhập</strong>
+            <small id="userEmail">Lịch sử riêng tư</small>
           </div>
         </div>
+        <button id="signInBtn" class="secondary wide" type="button">Đăng nhập Google</button>
+        <button id="signOutBtn" class="text-btn hidden" type="button">Đăng xuất</button>
+      </div>
+    </aside>
+
+    <div id="scrim" class="scrim"></div>
+
+    <main class="main">
+      <header class="topbar">
+        <button id="menuBtn" class="icon-btn" type="button" aria-label="Mở menu">☰</button>
+        <div class="top-title">
+          <strong id="viewTitle">Trò chuyện AI</strong>
+          <span class="status-dot"></span>
+          <small>Studio</small>
+        </div>
+        <button id="topNewChat" class="icon-btn" type="button" title="Chat mới">＋</button>
+      </header>
+
+      <section id="chatView" class="view chat-view">
+        <div id="messages" class="messages">
+          <div class="welcome">
+            <div class="welcome-logo">L</div>
+            <h1>Chào mừng đến LuaAI Studio</h1>
+            <p>Trợ lý AI dành cho Lua, Luau và ý tưởng sáng tạo của bạn.</p>
+            <div class="suggestions">
+              <button type="button" data-prompt="Giải thích sự khác nhau giữa Lua và Luau bằng ví dụ.">✦ Học Lua / Luau</button>
+              <button type="button" data-prompt="Viết một module Lua có chú thích và ví dụ sử dụng.">⌘ Tạo module</button>
+              <button type="button" data-prompt="Giúp tôi tìm lỗi trong đoạn code sau và giải thích cách sửa.">⚡ Gỡ lỗi code</button>
+            </div>
+          </div>
+        </div>
+
         <div class="composer-wrap">
           <div id="attachmentPreview" class="attachment-preview hidden"></div>
+
           <form id="chatForm" class="composer">
-            <textarea id="promptInput" rows="1" placeholder="Nhắn tin với LuaAI… (Enter để gửi, Shift+Enter xuống dòng)"></textarea>
-            <div class="composer-tools"><span class="hint">AI có thể mắc lỗi — hãy kiểm tra code trước khi chạy.</span><button id="sendBtn" class="send-btn" type="submit" aria-label="Gửi">↑</button></div>
+            <textarea
+              id="promptInput"
+              name="message"
+              rows="1"
+              placeholder="Nhắn tin với LuaAI… (Enter để gửi, Shift+Enter xuống dòng)"
+              aria-label="Tin nhắn"
+            ></textarea>
+
+            <div class="composer-tools">
+              <span class="hint">AI có thể mắc lỗi — hãy kiểm tra code trước khi chạy.</span>
+              <button id="sendBtn" class="send-btn" type="submit" aria-label="Gửi">↑</button>
+            </div>
           </form>
+
           <div class="fineprint">Không chia sẻ API key hoặc thông tin nhạy cảm trong cuộc trò chuyện.</div>
         </div>
       </section>
+
       <section id="scriptsView" class="view content-view hidden">
-        <div class="page-heading"><div><p class="eyebrow">YOUR TOOLBOX</p><h1>Thư viện script</h1><p class="muted">Mẫu Lua/Luau cơ bản để học tập và phát triển dự án của bạn.</p></div><input id="scriptSearch" class="search" placeholder="Tìm script…"></div>
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">YOUR TOOLBOX</p>
+            <h1>Thư viện script</h1>
+            <p class="muted">Mẫu Lua/Luau cơ bản để học tập và phát triển dự án của bạn.</p>
+          </div>
+          <input id="scriptSearch" class="search" placeholder="Tìm script…">
+        </div>
         <div id="scriptGrid" class="script-grid"></div>
       </section>
+
       <section id="wallpapersView" class="view content-view hidden">
-        <div class="page-heading"><div><p class="eyebrow">IMAGE WORKSPACE</p><h1>Wallpaper</h1><p class="muted">Tải ảnh lên Firebase Storage để nhận URL có thể chia sẻ.</p></div></div>
-        <div class="upload-panel"><div class="upload-icon">▧</div><h2>Tải wallpaper lên</h2><p class="muted">PNG, JPG hoặc WEBP · tối đa 8 MB</p><label class="primary file-label">Chọn ảnh<input id="wallpaperFile" type="file" accept="image/png,image/jpeg,image/webp"></label><div id="uploadStatus" class="muted small"></div></div>
-        <div class="section-head"><h2>Lịch sử ảnh</h2><span class="muted small">Lưu theo tài khoản</span></div><div id="wallpaperGrid" class="wallpaper-grid"><p class="muted">Đăng nhập để xem lịch sử ảnh.</p></div>
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">IMAGE WORKSPACE</p>
+            <h1>Wallpaper</h1>
+            <p class="muted">Tải ảnh lên Firebase Storage để nhận URL có thể chia sẻ.</p>
+          </div>
+        </div>
+
+        <div class="upload-panel">
+          <div class="upload-icon">▧</div>
+          <h2>Tải wallpaper lên</h2>
+          <p class="muted">PNG, JPG hoặc WEBP · tối đa 8 MB</p>
+          <label class="primary file-label">
+            Chọn ảnh
+            <input id="wallpaperFile" type="file" accept="image/png,image/jpeg,image/webp">
+          </label>
+          <div id="uploadStatus" class="muted small"></div>
+        </div>
+
+        <div class="section-head">
+          <h2>Lịch sử ảnh</h2>
+          <span class="muted small">Lưu theo tài khoản</span>
+        </div>
+        <div id="wallpaperGrid" class="wallpaper-grid">
+          <p class="muted">Đăng nhập để xem lịch sử ảnh.</p>
+        </div>
       </section>
     </main>
   </div>
-  <div id="toast" class="toast" role="status"></div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
   <script type="module" src="./app.js"></script>
 </body>
-</html>
+  </html>
