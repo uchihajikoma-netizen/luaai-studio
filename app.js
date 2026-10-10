@@ -38,7 +38,8 @@ const firebaseConfig = {
   appId: "1:476650134947:web:6d2a1795eb134b32790e16"
 };
 
-const WORKER_URL = "https://luaai-mini-api.uchihajikoma.workers.dev";
+const WORKER_URL =
+  "https://luaai-mini-api.uchihajikoma.workers.dev";
 
 const $ = id => document.getElementById(id);
 
@@ -48,12 +49,17 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 const provider = new GoogleAuthProvider();
 
+provider.setCustomParameters({
+  prompt: "select_account"
+});
+
 let currentUser = null;
 let activeChatId = null;
 let messages = [];
 let chats = [];
 let wallpapers = [];
 let busy = false;
+let authReady = false;
 
 const scripts = [
   {
@@ -110,7 +116,10 @@ function toast(message) {
 
   t.textContent = message;
   t.classList.add("show");
-  setTimeout(() => t.classList.remove("show"), 3000);
+
+  setTimeout(() => {
+    t.classList.remove("show");
+  }, 3000);
 }
 
 function esc(s = "") {
@@ -126,7 +135,10 @@ function esc(s = "") {
 function showView(view) {
   ["chat", "scripts", "wallpapers"].forEach(v => {
     const el = $(`${v}View`);
-    if (el) el.classList.toggle("hidden", v !== view);
+
+    if (el) {
+      el.classList.toggle("hidden", v !== view);
+    }
   });
 
   document.querySelectorAll(".nav-item").forEach(b => {
@@ -167,7 +179,9 @@ function resetChat() {
     root.append(welcomeNode());
   }
 
-  if ($("promptInput")) $("promptInput").value = "";
+  if ($("promptInput")) {
+    $("promptInput").value = "";
+  }
 
   showView("chat");
 }
@@ -184,13 +198,15 @@ function welcomeNode() {
       <button data-prompt="Giải thích sự khác nhau giữa Lua và Luau bằng ví dụ.">✦ Học Lua / Luau</button>
       <button data-prompt="Viết một module Lua có chú thích và ví dụ sử dụng.">⌘ Tạo module</button>
       <button data-prompt="Giúp tôi tìm lỗi trong đoạn code sau và giải thích cách sửa.">⚡ Gỡ lỗi code</button>
-    </div>`;
+    </div>
+  `;
 
   return d;
 }
 
 function renderMessages() {
   const root = $("messages");
+
   if (!root) return;
 
   root.innerHTML = "";
@@ -204,7 +220,8 @@ function renderMessages() {
     const el = document.createElement("div");
 
     el.className =
-      "message " + (m.role === "user" ? "user" : "assistant");
+      "message " +
+      (m.role === "user" ? "user" : "assistant");
 
     const body = m.role === "assistant"
       ? renderMarkdownLite(m.content)
@@ -212,7 +229,8 @@ function renderMessages() {
 
     el.innerHTML = `
       <div class="message-avatar">${m.role === "user" ? "Bạn" : "L"}</div>
-      <div class="message-body">${body}</div>`;
+      <div class="message-body">${body}</div>
+    `;
 
     root.append(el);
   }
@@ -231,11 +249,12 @@ function renderMarkdownLite(text) {
 
   s = s.replace(
     /```(?:lua|luau|javascript|js|json|text)?\n([\s\S]*?)```/gi,
-    (_, code) =>
-      `<pre><code>${code.trim()}</code></pre>
-       <div class="code-actions">
-         <button class="small-btn" data-copy="${encodeURIComponent(code.trim())}">Sao chép code</button>
-       </div>`
+    (_, code) => `
+      <pre><code>${code.trim()}</code></pre>
+      <div class="code-actions">
+        <button class="small-btn" data-copy="${encodeURIComponent(code.trim())}">Sao chép code</button>
+      </div>
+    `
   );
 
   s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
@@ -251,17 +270,20 @@ async function copyText(s) {
     toast("Đã sao chép");
   } catch {
     const ta = document.createElement("textarea");
+
     ta.value = s;
     document.body.append(ta);
     ta.select();
     document.execCommand("copy");
     ta.remove();
+
     toast("Đã sao chép");
   }
 }
 
 function renderScripts(filter = "") {
   const root = $("scriptGrid");
+
   if (!root) return;
 
   root.innerHTML = "";
@@ -284,7 +306,8 @@ function renderScripts(filter = "") {
         <div class="script-actions">
           <button class="secondary" data-copy-script="${s.id}">Sao chép</button>
           <button class="primary" data-use-script="${s.id}">Hỏi AI</button>
-        </div>`;
+        </div>
+      `;
 
       root.append(card);
     });
@@ -292,6 +315,7 @@ function renderScripts(filter = "") {
   root.querySelectorAll("[data-copy-script]").forEach(b => {
     b.onclick = () => {
       const s = scripts.find(x => x.id === b.dataset.copyScript);
+
       if (s) copyText(s.code);
     };
   });
@@ -299,6 +323,7 @@ function renderScripts(filter = "") {
   root.querySelectorAll("[data-use-script]").forEach(b => {
     b.onclick = () => {
       const s = scripts.find(x => x.id === b.dataset.useScript);
+
       if (!s) return;
 
       showView("chat");
@@ -313,6 +338,7 @@ function renderScripts(filter = "") {
 
 function renderChatList() {
   const root = $("chatList");
+
   if (!root) return;
 
   root.innerHTML = "";
@@ -331,9 +357,11 @@ function renderChatList() {
 
   chats.forEach(c => {
     const b = document.createElement("button");
+
     b.className = "history-item";
     b.textContent = c.title || "Cuộc trò chuyện mới";
     b.onclick = () => loadChat(c.id);
+
     root.append(b);
   });
 }
@@ -402,7 +430,7 @@ async function loadChat(id) {
   }
 }
 
-// GỬI TIN NHẮN: LẤY TOKEN FIREBASE VÀ GỬI ĐẾN WORKER
+// GỬI TIN NHẮN ĐẾN CLOUDFLARE WORKER
 async function askAI(prompt) {
   if (busy) return;
 
@@ -426,7 +454,7 @@ async function askAI(prompt) {
 
   const thinkingMessage = {
     role: "assistant",
-    content: "Đang suy nghĩ…"
+    content: "Đang kết nối AI..."
   };
 
   messages.push(userMessage, thinkingMessage);
@@ -436,40 +464,49 @@ async function askAI(prompt) {
   renderMessages();
 
   try {
-    // KIỂM TRA TÀI KHOẢN FIREBASE
+    // Chờ Firebase xác định trạng thái đăng nhập
+    await auth.authStateReady();
+
     const user = auth.currentUser;
 
     if (!user) {
       throw new Error(
-        "Firebase chưa xác nhận đăng nhập. Hãy tải lại trang và đăng nhập Google."
+        "Firebase chưa xác nhận đăng nhập. Hãy đăng nhập Google lại."
       );
     }
 
-    // LẤY FIREBASE ID TOKEN
-    const idToken = await user.getIdToken();
+    // Lấy token Firebase mới
+    const idToken = await user.getIdToken(true);
 
-    // GỬI TOKEN ĐẾN CLOUDFLARE WORKER
-    const response = await fetch(`${WORKER_URL}/api/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${idToken}`
-      },
-      body: JSON.stringify({
-        messages: messages
-          .filter(m => m !== thinkingMessage)
-          .map(m => ({
-            role: m.role,
-            content: m.content
-          }))
-      })
-    });
+    if (!idToken) {
+      throw new Error("Không lấy được mã xác thực Firebase.");
+    }
+
+    // Gửi token qua Authorization đến Worker
+    const response = await fetch(
+      `${WORKER_URL}/api/chat`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          messages: messages
+            .filter(m => m !== thinkingMessage)
+            .map(m => ({
+              role: m.role,
+              content: m.content
+            }))
+        })
+      }
+    );
 
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
       throw new Error(
-        data.error || `API lỗi (${response.status})`
+        data.error || `Worker trả về lỗi HTTP ${response.status}`
       );
     }
 
@@ -481,9 +518,10 @@ async function askAI(prompt) {
     }
 
     thinkingMessage.content = data.reply;
+
     renderMessages();
 
-    // LƯU LỊCH SỬ CHAT NẾU CÓ TÀI KHOẢN
+    // Lưu lịch sử chat vào tài khoản đang đăng nhập
     if (currentUser) {
       try {
         if (!activeChatId) {
@@ -511,8 +549,7 @@ async function askAI(prompt) {
 
     thinkingMessage.content =
       "Không thể kết nối AI: " +
-      (error.message || "Lỗi không xác định") +
-      "\n\nHãy kiểm tra Worker URL, xác thực Firebase, API key và cấu hình Gemini.";
+      (error.message || "Lỗi không xác định");
 
     renderMessages();
   } finally {
@@ -522,10 +559,13 @@ async function askAI(prompt) {
   }
 }
 
+// ĐĂNG NHẬP GOOGLE
 async function signIn() {
   try {
     await signInWithPopup(auth, provider);
   } catch (e) {
+    console.error("Lỗi đăng nhập:", e);
+
     if (
       [
         "auth/popup-blocked",
@@ -539,12 +579,12 @@ async function signIn() {
         toast("Đăng nhập lỗi: " + redirectError.message);
       }
     } else {
-      console.error(e);
       toast("Đăng nhập lỗi: " + e.message);
     }
   }
 }
 
+// TẢI WALLPAPER LÊN FIREBASE STORAGE
 async function uploadWallpaper(file) {
   if (!currentUser) {
     toast("Hãy đăng nhập Google trước.");
@@ -563,7 +603,9 @@ async function uploadWallpaper(file) {
 
   const status = $("uploadStatus");
 
-  if (status) status.textContent = "Đang tải ảnh lên…";
+  if (status) {
+    status.textContent = "Đang tải ảnh lên...";
+  }
 
   try {
     const safeName = file.name.replace(
@@ -613,6 +655,7 @@ async function uploadWallpaper(file) {
   }
 }
 
+// LỊCH SỬ WALLPAPER
 async function loadWallpapers() {
   if (!currentUser) return;
 
@@ -631,6 +674,7 @@ async function loadWallpapers() {
     }));
 
     const root = $("wallpaperGrid");
+
     if (!root) return;
 
     root.innerHTML = "";
@@ -643,6 +687,7 @@ async function loadWallpapers() {
 
     wallpapers.forEach(w => {
       const card = document.createElement("article");
+
       card.className = "wallpaper-card";
 
       card.innerHTML = `
@@ -652,7 +697,8 @@ async function loadWallpapers() {
           <button class="secondary" data-wall-copy="${esc(w.id)}">Sao chép URL</button>
           <a class="primary" style="text-align:center;text-decoration:none;padding:8px;border-radius:9px;font-size:12px"
              href="${esc(w.url)}" target="_blank" rel="noopener">Mở ảnh</a>
-        </div>`;
+        </div>
+      `;
 
       root.append(card);
     });
@@ -680,6 +726,7 @@ async function loadWallpapers() {
 
 // THEO DÕI TRẠNG THÁI ĐĂNG NHẬP
 onAuthStateChanged(auth, async user => {
+  authReady = true;
   currentUser = user;
 
   if (user) {
@@ -740,7 +787,15 @@ if ($("signInBtn")) {
 }
 
 if ($("signOutBtn")) {
-  $("signOutBtn").onclick = () => signOut(auth);
+  $("signOutBtn").onclick = async () => {
+    try {
+      await signOut(auth);
+      toast("Đã đăng xuất");
+    } catch (e) {
+      console.error(e);
+      toast("Đăng xuất thất bại.");
+    }
+  };
 }
 
 if ($("newChat")) {
@@ -779,7 +834,7 @@ if ($("wallpaperFile")) {
   };
 }
 
-// XỬ LÝ FORM GỬI TIN NHẮN
+// FORM GỬI TIN NHẮN
 const chatForm = $("chatForm");
 
 if (chatForm) {
@@ -831,9 +886,9 @@ document.addEventListener("click", e => {
   }
 });
 
+// HOÀN TẤT ĐĂNG NHẬP BẰNG REDIRECT NẾU CÓ
 getRedirectResult(auth).catch(e => {
   console.error("Redirect login:", e);
 });
 
 renderScripts();
-    
