@@ -15,7 +15,7 @@ const firebaseConfig = {
   appId: "1:476650134947:web:6d2a1795eb134b32790e16"
 };
 // Put the deployed Cloudflare Worker base URL here, with no trailing slash.
-const WORKER_URL = "https://luaai-studio.uchihajikoma.workers.dev";
+const WORKER_URL = "https://luaai-mini-api.uchihajikoma.workers.dev";
 
 const $ = (id) => document.getElementById(id);
 const app = initializeApp(firebaseConfig), auth = getAuth(app), db = getFirestore(app), storage = getStorage(app);
