@@ -1,16 +1,32 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
-  getAuth, GoogleAuthProvider, signInWithPopup,
-  signInWithRedirect, getRedirectResult,
-  onAuthStateChanged, signOut
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  onAuthStateChanged,
+  signOut
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
-  getFirestore, collection, doc, addDoc, getDocs,
-  getDoc, query, orderBy, limit, serverTimestamp, setDoc
+  getFirestore,
+  collection,
+  doc,
+  addDoc,
+  getDocs,
+  getDoc,
+  query,
+  orderBy,
+  limit,
+  serverTimestamp,
+  setDoc
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import {
-  getStorage, ref as storageRef, uploadBytes, getDownloadURL
+  getStorage,
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
 
 const firebaseConfig = {
@@ -22,7 +38,6 @@ const firebaseConfig = {
   appId: "1:476650134947:web:6d2a1795eb134b32790e16"
 };
 
-// Cloudflare Worker Mini
 const WORKER_URL = "https://luaai-mini-api.uchihajikoma.workers.dev";
 
 const $ = id => document.getElementById(id);
@@ -87,10 +102,12 @@ const scripts = [
 
 function toast(message) {
   const t = $("toast");
+
   if (!t) {
     console.log(message);
     return;
   }
+
   t.textContent = message;
   t.classList.add("show");
   setTimeout(() => t.classList.remove("show"), 3000);
@@ -117,6 +134,7 @@ function showView(view) {
   });
 
   const title = $("viewTitle");
+
   if (title) {
     title.textContent = ({
       chat: "Trò chuyện AI",
@@ -143,18 +161,21 @@ function resetChat() {
   messages = [];
 
   const root = $("messages");
+
   if (root) {
     root.innerHTML = "";
     root.append(welcomeNode());
   }
 
   if ($("promptInput")) $("promptInput").value = "";
+
   showView("chat");
 }
 
 function welcomeNode() {
   const d = document.createElement("div");
   d.className = "welcome";
+
   d.innerHTML = `
     <div class="welcome-logo">L</div>
     <h1>Chào mừng đến LuaAI Studio</h1>
@@ -164,6 +185,7 @@ function welcomeNode() {
       <button data-prompt="Viết một module Lua có chú thích và ví dụ sử dụng.">⌘ Tạo module</button>
       <button data-prompt="Giúp tôi tìm lỗi trong đoạn code sau và giải thích cách sửa.">⚡ Gỡ lỗi code</button>
     </div>`;
+
   return d;
 }
 
@@ -180,7 +202,9 @@ function renderMessages() {
 
   for (const m of messages) {
     const el = document.createElement("div");
-    el.className = "message " + (m.role === "user" ? "user" : "assistant");
+
+    el.className =
+      "message " + (m.role === "user" ? "user" : "assistant");
 
     const body = m.role === "assistant"
       ? renderMarkdownLite(m.content)
@@ -278,8 +302,10 @@ function renderScripts(filter = "") {
       if (!s) return;
 
       showView("chat");
+
       $("promptInput").value =
         `Giải thích và cải thiện mẫu Lua này:\n\n\`\`\`lua\n${s.code}\n\`\`\``;
+
       $("promptInput").focus();
     };
   });
@@ -292,12 +318,14 @@ function renderChatList() {
   root.innerHTML = "";
 
   if (!currentUser) {
-    root.innerHTML = '<p class="muted small">Đăng nhập để đồng bộ lịch sử.</p>';
+    root.innerHTML =
+      '<p class="muted small">Đăng nhập để đồng bộ lịch sử.</p>';
     return;
   }
 
   if (!chats.length) {
-    root.innerHTML = '<p class="muted small">Chưa có cuộc trò chuyện.</p>';
+    root.innerHTML =
+      '<p class="muted small">Chưa có cuộc trò chuyện.</p>';
     return;
   }
 
@@ -321,7 +349,12 @@ async function loadChats() {
     );
 
     const snap = await getDocs(q);
-    chats = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    chats = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }));
+
     renderChatList();
   } catch (e) {
     console.error("Lỗi tải lịch sử:", e);
@@ -335,7 +368,10 @@ async function saveChat() {
   await setDoc(
     doc(db, "users", currentUser.uid, "chats", activeChatId),
     {
-      title: (messages.find(m => m.role === "user")?.content || "Cuộc trò chuyện mới").slice(0, 70),
+      title: (
+        messages.find(m => m.role === "user")?.content ||
+        "Cuộc trò chuyện mới"
+      ).slice(0, 70),
       messages,
       updatedAt: serverTimestamp()
     },
@@ -357,6 +393,7 @@ async function loadChat(id) {
 
     activeChatId = id;
     messages = snap.data().messages || [];
+
     renderMessages();
     showView("chat");
   } catch (e) {
@@ -365,7 +402,7 @@ async function loadChat(id) {
   }
 }
 
-// GỬI TIN NHẮN: GỌI WORKER TRƯỚC, KHÔNG ĐỂ FIRESTORE CHẶN AI
+// GỬI TIN NHẮN: LẤY TOKEN FIREBASE VÀ GỬI ĐẾN WORKER
 async function askAI(prompt) {
   if (busy) return;
 
@@ -379,23 +416,44 @@ async function askAI(prompt) {
   }
 
   busy = true;
+
   if (sendBtn) sendBtn.disabled = true;
 
-  const userMessage = { role: "user", content: cleanPrompt };
+  const userMessage = {
+    role: "user",
+    content: cleanPrompt
+  };
+
   const thinkingMessage = {
     role: "assistant",
     content: "Đang suy nghĩ…"
   };
 
   messages.push(userMessage, thinkingMessage);
+
   if (input) input.value = "";
+
   renderMessages();
 
   try {
+    // KIỂM TRA TÀI KHOẢN FIREBASE
+    const user = auth.currentUser;
+
+    if (!user) {
+      throw new Error(
+        "Firebase chưa xác nhận đăng nhập. Hãy tải lại trang và đăng nhập Google."
+      );
+    }
+
+    // LẤY FIREBASE ID TOKEN
+    const idToken = await user.getIdToken();
+
+    // GỬI TOKEN ĐẾN CLOUDFLARE WORKER
     const response = await fetch(`${WORKER_URL}/api/chat`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`
       },
       body: JSON.stringify({
         messages: messages
@@ -415,15 +473,17 @@ async function askAI(prompt) {
       );
     }
 
-    if (typeof data.reply !== "string" || !data.reply.trim()) {
+    if (
+      typeof data.reply !== "string" ||
+      !data.reply.trim()
+    ) {
       throw new Error("AI chưa trả về nội dung.");
     }
 
     thinkingMessage.content = data.reply;
     renderMessages();
 
-    // Lưu lịch sử sau khi AI trả lời thành công.
-    // Nếu chưa đăng nhập hoặc Firestore lỗi, AI vẫn có thể chat.
+    // LƯU LỊCH SỬ CHAT NẾU CÓ TÀI KHOẢN
     if (currentUser) {
       try {
         if (!activeChatId) {
@@ -452,11 +512,12 @@ async function askAI(prompt) {
     thinkingMessage.content =
       "Không thể kết nối AI: " +
       (error.message || "Lỗi không xác định") +
-      "\n\nHãy kiểm tra Worker URL, API key, cấu hình Gemini và kết nối mạng.";
+      "\n\nHãy kiểm tra Worker URL, xác thực Firebase, API key và cấu hình Gemini.";
 
     renderMessages();
   } finally {
     busy = false;
+
     if (sendBtn) sendBtn.disabled = false;
   }
 }
@@ -465,11 +526,18 @@ async function signIn() {
   try {
     await signInWithPopup(auth, provider);
   } catch (e) {
-    if ([
-      "auth/popup-blocked",
-      "auth/operation-not-supported-in-this-environment"
-    ].includes(e.code)) {
-      await signInWithRedirect(auth, provider);
+    if (
+      [
+        "auth/popup-blocked",
+        "auth/operation-not-supported-in-this-environment"
+      ].includes(e.code)
+    ) {
+      try {
+        await signInWithRedirect(auth, provider);
+      } catch (redirectError) {
+        console.error(redirectError);
+        toast("Đăng nhập lỗi: " + redirectError.message);
+      }
     } else {
       console.error(e);
       toast("Đăng nhập lỗi: " + e.message);
@@ -494,14 +562,24 @@ async function uploadWallpaper(file) {
   }
 
   const status = $("uploadStatus");
+
   if (status) status.textContent = "Đang tải ảnh lên…";
 
   try {
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const path = `wallpapers/${currentUser.uid}/${Date.now()}_${safeName}`;
+    const safeName = file.name.replace(
+      /[^a-zA-Z0-9._-]/g,
+      "_"
+    );
+
+    const path =
+      `wallpapers/${currentUser.uid}/${Date.now()}_${safeName}`;
+
     const r = storageRef(storage, path);
 
-    await uploadBytes(r, file, { contentType: file.type });
+    await uploadBytes(r, file, {
+      contentType: file.type
+    });
+
     const url = await getDownloadURL(r);
 
     await addDoc(
@@ -522,11 +600,14 @@ async function uploadWallpaper(file) {
     }
 
     toast("Tải wallpaper thành công");
+
     await loadWallpapers();
   } catch (e) {
     console.error(e);
+
     if (status) {
-      status.textContent = "Tải lên thất bại: " + e.message +
+      status.textContent =
+        "Tải lên thất bại: " + e.message +
         " — kiểm tra Firebase Storage.";
     }
   }
@@ -544,7 +625,10 @@ async function loadWallpapers() {
       )
     );
 
-    wallpapers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    wallpapers = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }));
 
     const root = $("wallpaperGrid");
     if (!root) return;
@@ -552,7 +636,8 @@ async function loadWallpapers() {
     root.innerHTML = "";
 
     if (!wallpapers.length) {
-      root.innerHTML = '<p class="muted">Chưa có ảnh nào được tải lên.</p>';
+      root.innerHTML =
+        '<p class="muted">Chưa có ảnh nào được tải lên.</p>';
       return;
     }
 
@@ -574,13 +659,18 @@ async function loadWallpapers() {
 
     root.querySelectorAll("[data-wall-copy]").forEach(b => {
       b.onclick = () => {
-        const w = wallpapers.find(x => x.id === b.dataset.wallCopy);
+        const w = wallpapers.find(
+          x => x.id === b.dataset.wallCopy
+        );
+
         if (w) copyText(w.url);
       };
     });
   } catch (e) {
     console.error(e);
+
     const root = $("wallpaperGrid");
+
     if (root) {
       root.innerHTML =
         '<p class="muted">Không tải được lịch sử ảnh. Kiểm tra Firestore Rules.</p>';
@@ -588,13 +678,20 @@ async function loadWallpapers() {
   }
 }
 
-// Trạng thái đăng nhập
+// THEO DÕI TRẠNG THÁI ĐĂNG NHẬP
 onAuthStateChanged(auth, async user => {
   currentUser = user;
 
   if (user) {
-    if ($("userName")) $("userName").textContent = user.displayName || "Người dùng";
-    if ($("userEmail")) $("userEmail").textContent = user.email || "Đã đăng nhập";
+    if ($("userName")) {
+      $("userName").textContent =
+        user.displayName || "Người dùng";
+    }
+
+    if ($("userEmail")) {
+      $("userEmail").textContent =
+        user.email || "Đã đăng nhập";
+    }
 
     if ($("avatar")) {
       $("avatar").innerHTML = user.photoURL
@@ -605,11 +702,22 @@ onAuthStateChanged(auth, async user => {
     $("signInBtn")?.classList.add("hidden");
     $("signOutBtn")?.classList.remove("hidden");
 
-    await Promise.allSettled([loadChats(), loadWallpapers()]);
+    await Promise.allSettled([
+      loadChats(),
+      loadWallpapers()
+    ]);
   } else {
-    if ($("userName")) $("userName").textContent = "Chưa đăng nhập";
-    if ($("userEmail")) $("userEmail").textContent = "Lịch sử riêng tư";
-    if ($("avatar")) $("avatar").textContent = "?";
+    if ($("userName")) {
+      $("userName").textContent = "Chưa đăng nhập";
+    }
+
+    if ($("userEmail")) {
+      $("userEmail").textContent = "Lịch sử riêng tư";
+    }
+
+    if ($("avatar")) {
+      $("avatar").textContent = "?";
+    }
 
     $("signInBtn")?.classList.remove("hidden");
     $("signOutBtn")?.classList.add("hidden");
@@ -618,35 +726,60 @@ onAuthStateChanged(auth, async user => {
     renderChatList();
 
     const grid = $("wallpaperGrid");
+
     if (grid) {
-      grid.innerHTML = '<p class="muted">Đăng nhập để xem lịch sử ảnh.</p>';
+      grid.innerHTML =
+        '<p class="muted">Đăng nhập để xem lịch sử ảnh.</p>';
     }
   }
 });
 
-// Kết nối nút giao diện
-if ($("signInBtn")) $("signInBtn").onclick = signIn;
-if ($("signOutBtn")) $("signOutBtn").onclick = () => signOut(auth);
+// KẾT NỐI CÁC NÚT GIAO DIỆN
+if ($("signInBtn")) {
+  $("signInBtn").onclick = signIn;
+}
 
-if ($("newChat")) $("newChat").onclick = resetChat;
-if ($("topNewChat")) $("topNewChat").onclick = resetChat;
-if ($("menuBtn")) $("menuBtn").onclick = openMenu;
-if ($("closeSidebar")) $("closeSidebar").onclick = closeMenu;
-if ($("scrim")) $("scrim").onclick = closeMenu;
+if ($("signOutBtn")) {
+  $("signOutBtn").onclick = () => signOut(auth);
+}
+
+if ($("newChat")) {
+  $("newChat").onclick = resetChat;
+}
+
+if ($("topNewChat")) {
+  $("topNewChat").onclick = resetChat;
+}
+
+if ($("menuBtn")) {
+  $("menuBtn").onclick = openMenu;
+}
+
+if ($("closeSidebar")) {
+  $("closeSidebar").onclick = closeMenu;
+}
+
+if ($("scrim")) {
+  $("scrim").onclick = closeMenu;
+}
 
 document.querySelectorAll(".nav-item").forEach(b => {
   b.onclick = () => showView(b.dataset.view);
 });
 
 if ($("scriptSearch")) {
-  $("scriptSearch").oninput = e => renderScripts(e.target.value);
+  $("scriptSearch").oninput = e => {
+    renderScripts(e.target.value);
+  };
 }
 
 if ($("wallpaperFile")) {
-  $("wallpaperFile").onchange = e => uploadWallpaper(e.target.files[0]);
+  $("wallpaperFile").onchange = e => {
+    uploadWallpaper(e.target.files[0]);
+  };
 }
 
-// Xử lý form gửi tin nhắn
+// XỬ LÝ FORM GỬI TIN NHẮN
 const chatForm = $("chatForm");
 
 if (chatForm) {
@@ -663,34 +796,44 @@ if (chatForm) {
     askAI(prompt);
   });
 } else {
-  console.error("Không tìm thấy phần tử #chatForm trong index.html");
+  console.error(
+    "Không tìm thấy phần tử #chatForm trong index.html"
+  );
 }
 
-// Nhấn Enter để gửi, Shift+Enter để xuống dòng
+// ENTER ĐỂ GỬI, SHIFT + ENTER ĐỂ XUỐNG DÒNG
 if ($("promptInput")) {
   $("promptInput").addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
 
-      if (chatForm && typeof chatForm.requestSubmit === "function") {
+      if (
+        chatForm &&
+        typeof chatForm.requestSubmit === "function"
+      ) {
         chatForm.requestSubmit();
       } else {
         const prompt = $("promptInput").value.trim();
+
         if (prompt) askAI(prompt);
       }
     }
   });
 }
 
-// Các câu hỏi gợi ý
+// CÁC CÂU HỎI GỢI Ý
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-prompt]");
+
   if (b && $("promptInput")) {
     $("promptInput").value = b.dataset.prompt;
     $("promptInput").focus();
   }
 });
 
-getRedirectResult(auth).catch(e => console.error("Redirect login:", e));
+getRedirectResult(auth).catch(e => {
+  console.error("Redirect login:", e);
+});
+
 renderScripts();
-      
+    
