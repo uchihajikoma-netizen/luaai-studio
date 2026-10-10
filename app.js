@@ -367,7 +367,11 @@ function renderChatList() {
 }
 
 async function loadChats() {
-  if (!currentUser) return;
+  if (!currentUser) {
+    chats = [];
+    renderChatList();
+    return;
+  }
 
   try {
     const q = query(
@@ -386,7 +390,7 @@ async function loadChats() {
     renderChatList();
   } catch (e) {
     console.error("Lỗi tải lịch sử:", e);
-    toast("Không tải được lịch sử chat.");
+    toast("Không tải được lịch sử: " + (e.code || e.message));
   }
 }
 
@@ -400,7 +404,10 @@ async function saveChat() {
         messages.find(m => m.role === "user")?.content ||
         "Cuộc trò chuyện mới"
       ).slice(0, 70),
-      messages,
+      messages: messages.map(m => ({
+        role: m.role,
+        content: m.content
+      })),
       updatedAt: serverTimestamp()
     },
     { merge: true }
@@ -417,7 +424,10 @@ async function loadChat(id) {
       doc(db, "users", currentUser.uid, "chats", id)
     );
 
-    if (!snap.exists()) return;
+    if (!snap.exists()) {
+      toast("Không tìm thấy cuộc trò chuyện.");
+      return;
+    }
 
     activeChatId = id;
     messages = snap.data().messages || [];
@@ -425,12 +435,12 @@ async function loadChat(id) {
     renderMessages();
     showView("chat");
   } catch (e) {
-    console.error(e);
-    toast("Không tải được chat.");
+    console.error("Lỗi mở chat:", e);
+    toast("Không tải được chat: " + (e.code || e.message));
   }
 }
 
-// GỬI TIN NHẮN ĐẾN CLOUDFLARE WORKER
+// GỬI TIN NHẮN VÀ LƯU LỊCH SỬ
 async function askAI(prompt) {
   if (busy) return;
 
@@ -464,25 +474,22 @@ async function askAI(prompt) {
   renderMessages();
 
   try {
-    // Chờ Firebase xác định trạng thái đăng nhập
     await auth.authStateReady();
 
     const user = auth.currentUser;
 
     if (!user) {
       throw new Error(
-        "Firebase chưa xác nhận đăng nhập. Hãy đăng nhập Google lại."
+        "Bạn chưa đăng nhập Google. Hãy đăng nhập lại."
       );
     }
 
-    // Lấy token Firebase mới
     const idToken = await user.getIdToken(true);
 
     if (!idToken) {
       throw new Error("Không lấy được mã xác thực Firebase.");
     }
 
-    // Gửi token qua Authorization đến Worker
     const response = await fetch(
       `${WORKER_URL}/api/chat`,
       {
@@ -521,28 +528,53 @@ async function askAI(prompt) {
 
     renderMessages();
 
-    // Lưu lịch sử chat vào tài khoản đang đăng nhập
-    if (currentUser) {
-      try {
-        if (!activeChatId) {
-          const chatRef = await addDoc(
-            collection(db, "users", currentUser.uid, "chats"),
-            {
-              title: cleanPrompt.slice(0, 70),
-              messages: [],
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp()
-            }
-          );
+    // Dùng UID vừa xác thực để lưu lịch sử.
+    currentUser = user;
 
-          activeChatId = chatRef.id;
-        }
+    try {
+      if (!activeChatId) {
+        const chatRef = await addDoc(
+          collection(db, "users", user.uid, "chats"),
+          {
+            title: cleanPrompt.slice(0, 70),
+            messages: [],
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          }
+        );
 
-        await saveChat();
-      } catch (saveError) {
-        console.error("Lỗi lưu lịch sử:", saveError);
-        toast("AI đã trả lời nhưng chưa lưu được lịch sử.");
+        activeChatId = chatRef.id;
       }
+
+      await setDoc(
+        doc(db, "users", user.uid, "chats", activeChatId),
+        {
+          title: (
+            messages.find(m => m.role === "user")?.content ||
+            "Cuộc trò chuyện mới"
+          ).slice(0, 70),
+
+          messages: messages.map(m => ({
+            role: m.role,
+            content: m.content
+          })),
+
+          updatedAt: serverTimestamp()
+        },
+        { merge: true }
+      );
+
+      await loadChats();
+
+      console.log("Đã lưu lịch sử chat thành công.");
+      toast("Đã lưu lịch sử chat.");
+    } catch (saveError) {
+      console.error("LỖI LƯU FIRESTORE:", saveError);
+
+      toast(
+        "Lỗi lưu lịch sử: " +
+        (saveError.code || saveError.message)
+      );
     }
   } catch (error) {
     console.error("Lỗi gọi AI:", error);
@@ -645,7 +677,7 @@ async function uploadWallpaper(file) {
 
     await loadWallpapers();
   } catch (e) {
-    console.error(e);
+    console.error("Lỗi tải wallpaper:", e);
 
     if (status) {
       status.textContent =
@@ -713,7 +745,7 @@ async function loadWallpapers() {
       };
     });
   } catch (e) {
-    console.error(e);
+    console.error("Lỗi tải lịch sử wallpaper:", e);
 
     const root = $("wallpaperGrid");
 
@@ -892,3 +924,4 @@ getRedirectResult(auth).catch(e => {
 });
 
 renderScripts();
+    
