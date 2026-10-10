@@ -1,221 +1,221 @@
-
-const corsHeaders = (origin, allowed) => ({
-  "Access-Control-Allow-Origin": allowed === "*" ? "*" : allowed,
-  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  "Access-Control-Max-Age": "86400",
-  "Vary": "Origin"
+const corsHeaders = (origin = "*") => ({
+"Access-Control-Allow-Origin": origin,
+"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+"Access-Control-Allow-Headers": "Content-Type, Authorization",
+"Access-Control-Max-Age": "86400",
+"Vary": "Origin"
 });
 
 function json(data, status = 200, headers = {}) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      ...headers
-    }
-  });
+return new Response(JSON.stringify(data), {
+status,
+headers: {
+"Content-Type": "application/json; charset=utf-8",
+...headers
+}
+});
 }
 
-function b64urlDecode(s) {
-  s = s.replace(/-/g, "+").replace(/_/g, "/");
-  const bin = atob(s + "=".repeat((4 - s.length % 4) % 4));
-  return Uint8Array.from(bin, c => c.charCodeAt(0));
+function decodeBase64Url(value) {
+const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+const binary = atob(padded);
+return Uint8Array.from(binary, c => c.charCodeAt(0));
+}
+
+function decodeJwtPart(value) {
+return JSON.parse(new TextDecoder().decode(decodeBase64Url(value)));
 }
 
 async function verifyFirebaseToken(token, projectId) {
-  const parts = token.split(".");
-  if (parts.length !== 3) throw new Error("Token không hợp lệ.");
+const parts = token.split(".");
+if (parts.length !== 3) {
+throw new Error("Token đăng nhập không hợp lệ.");
+}
 
-  const header = JSON.parse(
-    new TextDecoder().decode(b64urlDecode(parts[0]))
-  );
-  const payload = JSON.parse(
-    new TextDecoder().decode(b64urlDecode(parts[1]))
-  );
+const header = decodeJwtPart(parts[0]);
+const payload = decodeJwtPart(parts[1]);
 
-  if (header.alg !== "RS256" || !header.kid) {
-    throw new Error("Kiểu token không hợp lệ.");
-  }
+if (
+header.alg !== "RS256" ||
+!header.kid ||
+payload.aud !== projectId ||
+payload.iss !== "https://securetoken.google.com/${projectId}" ||
+typeof payload.sub !== "string" ||
+!payload.sub ||
+payload.sub.length > 128 ||
+!Number.isFinite(payload.exp) ||
+payload.exp <= Math.floor(Date.now() / 1000) ||
+!Number.isFinite(payload.iat) ||
+payload.iat > Math.floor(Date.now() / 1000) + 300
+) {
+throw new Error("Token Firebase hết hạn hoặc không hợp lệ.");
+}
 
-  const now = Math.floor(Date.now() / 1000);
+const response = await fetch(
+"https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"
+);
 
-  if (
-    payload.aud !== projectId ||
-    payload.iss !== `https://securetoken.google.com/${projectId}` ||
-    !payload.sub ||
-    payload.exp <= now ||
-    payload.iat > now + 60 ||
-    payload.auth_time > now + 60
-  ) {
-    throw new Error("Token hết hạn hoặc sai Firebase project.");
-  }
+if (!response.ok) {
+throw new Error("Không thể xác minh Firebase.");
+}
 
-  const response = await fetch(
-    "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com",
-    { cf: { cacheTtl: 3600 } }
-  );
+const jwks = await response.json();
+const jwk = jwks.keys.find(key => key.kid === header.kid);
 
-  if (!response.ok) throw new Error("Không xác minh được token.");
+if (!jwk) {
+throw new Error("Không tìm thấy khóa xác minh Firebase.");
+}
 
-  const jwks = await response.json();
-  const jwk = jwks.keys.find(k => k.kid === header.kid);
+const publicKey = await crypto.subtle.importKey(
+"jwk",
+jwk,
+{ name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+false,
+["verify"]
+);
 
-  if (!jwk) throw new Error("Không tìm thấy khóa xác minh.");
+const signedData = new TextEncoder().encode("${parts[0]}.${parts[1]}");
+const signature = decodeBase64Url(parts[2]);
 
-  const key = await crypto.subtle.importKey(
-    "jwk",
-    jwk,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["verify"]
-  );
+const valid = await crypto.subtle.verify(
+"RSASSA-PKCS1-v1_5",
+publicKey,
+signature,
+signedData
+);
 
-  const valid = await crypto.subtle.verify(
-    "RSASSA-PKCS1-v1_5",
-    key,
-    b64urlDecode(parts[2]),
-    new TextEncoder().encode(parts[0] + "." + parts[1])
-  );
+if (!valid) {
+throw new Error("Chữ ký Firebase không hợp lệ.");
+}
 
-  if (!valid) throw new Error("Chữ ký token không hợp lệ.");
-  return payload;
+return payload;
 }
 
 export default {
-  async fetch(request, env) {
-    const origin = request.headers.get("Origin") || "";
-    const allowed = env.ALLOWED_ORIGIN || "*";
-    const headers = corsHeaders(origin, allowed);
-    const url = new URL(request.url);
+async fetch(request, env) {
+const origin = request.headers.get("Origin") || "*";
+const headers = corsHeaders(origin);
 
-    if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers });
-    }
+if (request.method === "OPTIONS") {
+  return new Response(null, { status: 204, headers });
+}
 
-    if (url.pathname === "/api/health" && request.method === "GET") {
-      return json({
-        ok: true,
-        service: "LuaAI Studio Worker",
-        provider: "OpenRouter"
-      }, 200, headers);
-    }
+const url = new URL(request.url);
 
-    if (url.pathname !== "/api/chat" || request.method !== "POST") {
-      return json({ error: "Not found" }, 404, headers);
-    }
+if (url.pathname === "/api/health" && request.method === "GET") {
+  return json({
+    ok: true,
+    service: "LuaAI Studio Worker",
+    provider: "Groq",
+    model: "openai/gpt-oss-120b"
+  }, 200, headers);
+}
 
-    if (allowed !== "*" && origin !== allowed) {
-      return json({ error: "Origin không được phép." }, 403, headers);
-    }
+if (url.pathname !== "/api/chat") {
+  return json({ error: "Không tìm thấy endpoint." }, 404, headers);
+}
 
-    if (
-      !env.OPENROUTER_API_KEY ||
-      !env.FIREBASE_PROJECT_ID ||
-      !env.AI_MODEL
-    ) {
-      return json({
-        error: "Thiếu OPENROUTER_API_KEY, FIREBASE_PROJECT_ID hoặc AI_MODEL."
-      }, 500, headers);
-    }
+if (request.method !== "POST") {
+  return json({ error: "Chỉ hỗ trợ POST." }, 405, headers);
+}
 
-    const auth = request.headers.get("Authorization") || "";
-    if (!auth.startsWith("Bearer ")) {
-      return json({ error: "Bạn cần đăng nhập Google." }, 401, headers);
-    }
+if (!env.GROQ_API_KEY || !env.FIREBASE_PROJECT_ID) {
+  return json({
+    error: "Thiếu GROQ_API_KEY hoặc FIREBASE_PROJECT_ID trong Cloudflare."
+  }, 500, headers);
+}
 
-    let user;
-    try {
-      user = await verifyFirebaseToken(
-        auth.slice(7),
-        env.FIREBASE_PROJECT_ID
-      );
-    } catch (e) {
-      return json({
-        error: "Xác thực thất bại: " + e.message
-      }, 401, headers);
-    }
+try {
+  const authorization = request.headers.get("Authorization") || "";
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
 
-    let body;
-    try {
-      body = await request.json();
-    } catch {
-      return json({ error: "JSON không hợp lệ." }, 400, headers);
-    }
-
-    if (
-      !Array.isArray(body.messages) ||
-      body.messages.length < 1 ||
-      body.messages.length > 40
-    ) {
-      return json({ error: "Danh sách tin nhắn không hợp lệ." }, 400, headers);
-    }
-
-    const messages = body.messages
-      .filter(m =>
-        m &&
-        ["user", "assistant"].includes(m.role) &&
-        typeof m.content === "string"
-      )
-      .map(m => ({
-        role: m.role,
-        content: m.content.slice(0, 16000)
-      }));
-
-    if (!messages.length || messages[messages.length - 1].role !== "user") {
-      return json({ error: "Tin nhắn cuối phải là user." }, 400, headers);
-    }
-
-    try {
-      const upstream = await fetch(
-        "https://openrouter.ai/api/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${env.OPENROUTER_API_KEY}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://uchihajikoma-netizen.github.io/luaai-studio/",
-            "X-Title": "LuaAI Studio"
-          },
-          body: JSON.stringify({
-            model: env.AI_MODEL,
-            messages: [
-              {
-                role: "system",
-                content:
-                  "Bạn là LuaAI Studio, trợ lý chuyên về Roblox Lua và Luau hợp lệ. Giải thích bằng tiếng Việt khi phù hợp. Đặt code trong fenced code block. Không hướng dẫn khai thác hoặc phá hoại server. Không khẳng định code đã được kiểm thử nếu chưa chạy."
-              },
-              ...messages
-            ],
-            temperature: 0.7,
-            max_tokens: 3000
-          })
-        }
-      );
-
-      const result = await upstream.json().catch(() => ({}));
-
-      if (!upstream.ok) {
-        return json({
-          error: result.error?.message ||
-            `OpenRouter trả về HTTP ${upstream.status}`
-        }, 502, headers);
-      }
-
-      const reply = result.choices?.[0]?.message?.content;
-
-      if (typeof reply !== "string" || !reply.trim()) {
-        return json({
-          error: "OpenRouter không trả về văn bản. Hãy kiểm tra model đã chọn."
-        }, 502, headers);
-      }
-
-      return json({ reply, uid: user.sub }, 200, headers);
-    } catch {
-      return json({
-        error: "Không thể kết nối OpenRouter. Hãy kiểm tra cấu hình và kết nối mạng."
-      }, 502, headers);
-    }
+  if (!match) {
+    return json({ error: "Bạn cần đăng nhập Google." }, 401, headers);
   }
+
+  const user = await verifyFirebaseToken(
+    match[1],
+    env.FIREBASE_PROJECT_ID
+  );
+
+  const body = await request.json();
+
+  let messages = Array.isArray(body.messages)
+    ? body.messages
+    : [{
+        role: "user",
+        content: String(body.message ?? body.prompt ?? "")
+      }];
+
+  messages = messages
+    .filter(m =>
+      m &&
+      ["system", "user", "assistant"].includes(m.role) &&
+      typeof m.content === "string"
+    )
+    .slice(-30);
+
+  if (!messages.length || !messages.some(m => m.role === "user" && m.content.trim())) {
+    return json({ error: "Hãy nhập nội dung bạn muốn hỏi AI." }, 400, headers);
+  }
+
+  const systemPrompt = {
+    role: "system",
+    content:
+      "Bạn là LuaAI Studio, trợ lý lập trình Roblox Luau. " +
+      "Trả lời bằng tiếng Việt khi người dùng viết tiếng Việt. " +
+      "Hỗ trợ viết, giải thích, sửa lỗi và tối ưu script Roblox hợp lệ. " +
+      "Không hướng dẫn khai thác, gian lận hoặc phá hoại server. " +
+      "Khi được yêu cầu viết code, hãy cung cấp code rõ ràng trong Markdown."
+  };
+
+  const groqResponse = await fetch(
+    "https://api.groq.com/openai/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${env.GROQ_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-oss-120b",
+        messages: [systemPrompt, ...messages],
+        temperature: 0.7,
+        max_completion_tokens: 4096
+      })
+    }
+  );
+
+  const result = await groqResponse.json();
+
+  if (!groqResponse.ok) {
+    console.error("Groq API error:", JSON.stringify(result));
+
+    return json({
+      error: result.error?.message || "Groq API gặp lỗi.",
+      provider: "Groq"
+    }, 502, headers);
+  }
+
+  const reply = result.choices?.[0]?.message?.content;
+
+  if (typeof reply !== "string" || !reply.trim()) {
+    return json({ error: "AI chưa trả về nội dung. Hãy thử lại." }, 502, headers);
+  }
+
+  return json({
+    reply,
+    uid: user.sub
+  }, 200, headers);
+
+} catch (error) {
+  console.error("Worker error:", error.message);
+
+  return json({
+    error: error.message || "Không thể kết nối AI."
+  }, 500, headers);
+}
+
+}
 };
-                                    
