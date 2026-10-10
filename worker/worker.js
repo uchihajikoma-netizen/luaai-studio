@@ -94,7 +94,11 @@ export default {
     }
 
     if (url.pathname === "/api/health" && request.method === "GET") {
-      return json({ ok: true, service: "LuaAI Studio Worker" }, 200, headers);
+      return json({
+        ok: true,
+        service: "LuaAI Studio Worker",
+        provider: "OpenRouter"
+      }, 200, headers);
     }
 
     if (url.pathname !== "/api/chat" || request.method !== "POST") {
@@ -105,9 +109,13 @@ export default {
       return json({ error: "Origin không được phép." }, 403, headers);
     }
 
-    if (!env.AI_API_KEY || !env.FIREBASE_PROJECT_ID || !env.AI_MODEL) {
+    if (
+      !env.OPENROUTER_API_KEY ||
+      !env.FIREBASE_PROJECT_ID ||
+      !env.AI_MODEL
+    ) {
       return json({
-        error: "Thiếu AI_API_KEY, FIREBASE_PROJECT_ID hoặc AI_MODEL."
+        error: "Thiếu OPENROUTER_API_KEY, FIREBASE_PROJECT_ID hoặc AI_MODEL."
       }, 500, headers);
     }
 
@@ -123,7 +131,9 @@ export default {
         env.FIREBASE_PROJECT_ID
       );
     } catch (e) {
-      return json({ error: "Xác thực thất bại: " + e.message }, 401, headers);
+      return json({
+        error: "Xác thực thất bại: " + e.message
+      }, 401, headers);
     }
 
     let body;
@@ -148,8 +158,8 @@ export default {
         typeof m.content === "string"
       )
       .map(m => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content.slice(0, 16000) }]
+        role: m.role,
+        content: m.content.slice(0, 16000)
       }));
 
     if (!messages.length || messages[messages.length - 1].role !== "user") {
@@ -157,56 +167,55 @@ export default {
     }
 
     try {
-      const endpoint =
-        "https://generativelanguage.googleapis.com/v1beta/models/" +
-        encodeURIComponent(env.AI_MODEL) +
-        ":generateContent";
-
-      const upstream = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "x-goog-api-key": env.AI_API_KEY,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{
-              text: "Bạn là LuaAI Studio, trợ lý chuyên về Roblox Lua và Luau hợp lệ. Giải thích bằng tiếng Việt khi phù hợp. Đặt code trong fenced code block. Không hướng dẫn khai thác hoặc phá hoại server. Không khẳng định code đã được kiểm thử nếu chưa chạy."
-            }]
+      const upstream = await fetch(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${env.OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://uchihajikoma-netizen.github.io/luaai-studio/",
+            "X-Title": "LuaAI Studio"
           },
-          contents: messages,
-          generationConfig: {
+          body: JSON.stringify({
+            model: env.AI_MODEL,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "Bạn là LuaAI Studio, trợ lý chuyên về Roblox Lua và Luau hợp lệ. Giải thích bằng tiếng Việt khi phù hợp. Đặt code trong fenced code block. Không hướng dẫn khai thác hoặc phá hoại server. Không khẳng định code đã được kiểm thử nếu chưa chạy."
+              },
+              ...messages
+            ],
             temperature: 0.7,
-            maxOutputTokens: 3000
-          }
-        })
-      });
+            max_tokens: 3000
+          })
+        }
+      );
 
       const result = await upstream.json().catch(() => ({}));
 
       if (!upstream.ok) {
         return json({
           error: result.error?.message ||
-            `Gemini trả về HTTP ${upstream.status}`
+            `OpenRouter trả về HTTP ${upstream.status}`
         }, 502, headers);
       }
 
-      const reply = result.candidates?.[0]?.content?.parts
-        ?.map(part => part.text || "")
-        .join("");
+      const reply = result.choices?.[0]?.message?.content;
 
       if (typeof reply !== "string" || !reply.trim()) {
         return json({
-          error: "Gemini không trả về văn bản. Có thể yêu cầu bị chặn hoặc model không khả dụng."
+          error: "OpenRouter không trả về văn bản. Hãy kiểm tra model đã chọn."
         }, 502, headers);
       }
 
       return json({ reply, uid: user.sub }, 200, headers);
     } catch {
       return json({
-        error: "Không thể kết nối Gemini. Hãy kiểm tra cấu hình và kết nối mạng."
+        error: "Không thể kết nối OpenRouter. Hãy kiểm tra cấu hình và kết nối mạng."
       }, 502, headers);
     }
   }
 };
-        
+                                    
